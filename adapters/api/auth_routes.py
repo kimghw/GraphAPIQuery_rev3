@@ -84,24 +84,26 @@ async def list_accounts(
 ) -> AccountListResponse:
     """List all accounts."""
     try:
-        accounts = await auth_usecases.get_all_accounts()
+        accounts_data = await auth_usecases.get_all_accounts()
         
-        account_responses = [
-            AccountResponse(
-                id=account.id,
-                email=account.email,
-                user_id=account.user_id,
-                tenant_id=account.tenant_id,
-                client_id=account.client_id,
-                authentication_flow=account.authentication_flow,
-                status=account.status,
-                scopes=account.scopes,
-                created_at=account.created_at,
-                updated_at=account.updated_at,
-                last_authenticated_at=account.last_authenticated_at
+        account_responses = []
+        for account_data in accounts_data:
+            account = account_data["account"]
+            account_responses.append(
+                AccountResponse(
+                    id=account["id"],
+                    email=account["email"],
+                    user_id=account["user_id"],
+                    tenant_id=account["tenant_id"],
+                    client_id=account["client_id"],
+                    authentication_flow=account["authentication_flow"],
+                    status=account["status"],
+                    scopes=account["scopes"],
+                    created_at=account["created_at"],
+                    updated_at=account.get("updated_at"),
+                    last_authenticated_at=account.get("last_authenticated_at")
+                )
             )
-            for account in accounts
-        ]
         
         return AccountListResponse(
             accounts=account_responses,

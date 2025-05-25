@@ -107,16 +107,16 @@ async def get_auth_usecases(
     token_repo: TokenRepository = Depends(get_token_repository),
     auth_log_repo: AuthenticationLogRepository = Depends(get_auth_log_repository),
     oauth_client: OAuthClientAdapter = Depends(get_oauth_client),
-    graph_client: GraphAPIClientAdapter = Depends(get_graph_client)
+    settings: Settings = Depends(get_settings)
 ) -> AuthenticationUseCases:
     """Get authentication use cases."""
     return AuthenticationUseCases(
-        account_repository=account_repo,
-        auth_flow_repository=auth_flow_repo,
-        token_repository=token_repo,
-        auth_log_repository=auth_log_repo,
+        account_repo=account_repo,
+        auth_flow_repo=auth_flow_repo,
+        token_repo=token_repo,
+        auth_log_repo=auth_log_repo,
         oauth_client=oauth_client,
-        graph_client=graph_client
+        config=settings
     )
 
 
