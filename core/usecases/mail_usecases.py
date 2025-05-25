@@ -13,7 +13,7 @@ from core.usecases.ports import (
     AccountRepositoryPort, TokenRepositoryPort, MailRepositoryPort,
     MailQueryHistoryRepositoryPort, DeltaLinkRepositoryPort,
     WebhookRepositoryPort, ExternalAPIRepositoryPort,
-    MicrosoftGraphClientPort, ExternalAPIClientPort, ConfigPort
+    GraphAPIClientPort, ExternalAPIClientPort, ConfigPort
 )
 
 logger = structlog.get_logger()
@@ -31,7 +31,7 @@ class MailUseCases:
         delta_link_repo: DeltaLinkRepositoryPort,
         webhook_repo: WebhookRepositoryPort,
         external_api_repo: ExternalAPIRepositoryPort,
-        graph_client: MicrosoftGraphClientPort,
+        graph_client: GraphAPIClientPort,
         external_api_client: ExternalAPIClientPort,
         config: ConfigPort
     ):

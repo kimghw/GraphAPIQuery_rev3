@@ -11,10 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
 from config.settings import Settings
-from adapters.db.database import DatabaseAdapter, Base
-from adapters.db.repositories import DatabaseRepositoryAdapter
-from adapters.external.graph_client import GraphAPIAdapter
-from adapters.external.oauth_client import OAuthAdapter
+from adapters.db.database import DatabaseAdapter
+from adapters.db.models import Base
+from adapters.db.repository_adapter import DatabaseRepositoryAdapter
+from adapters.external.graph_client import GraphAPIClientAdapter
+from adapters.external.oauth_client import OAuthClientAdapter
 from core.usecases.auth_usecases import AuthenticationUseCases
 from core.usecases.mail_usecases import MailUseCases
 from core.domain.entities import (
@@ -35,13 +36,15 @@ def event_loop():
 def test_settings() -> Settings:
     """Test settings."""
     return Settings(
-        ENVIRONMENT="test",
+        ENVIRONMENT="testing",
         DATABASE_URL="sqlite+aiosqlite:///:memory:",
         DATABASE_ECHO=False,
-        MICROSOFT_TENANT_ID="test-tenant",
-        MICROSOFT_CLIENT_ID="test-client",
-        MICROSOFT_CLIENT_SECRET="test-secret",
-        MICROSOFT_REDIRECT_URI="http://localhost:8000/auth/callback",
+        CLIENT_ID="test-client",
+        TENANT_ID="test-tenant",
+        CLIENT_SECRET="test-secret",
+        USER_ID="test@example.com",
+        REDIRECT_URI="http://localhost:8000/auth/callback",
+        AUTHORITY="https://login.microsoftonline.com/test-tenant",
         EXTERNAL_API_ENDPOINT="http://localhost:9000/api/messages",
         EXTERNAL_API_TIMEOUT=30,
         EXTERNAL_API_RETRY_ATTEMPTS=3,
@@ -70,7 +73,10 @@ async def db_adapter(test_settings: Settings) -> AsyncGenerator[DatabaseAdapter,
         engine, class_=AsyncSession, expire_on_commit=False
     )
     
-    adapter = DatabaseAdapter(engine, async_session_factory)
+    adapter = DatabaseAdapter(test_settings)
+    adapter._async_engine = engine
+    adapter._async_session_factory = async_session_factory
+    adapter._initialized = True
     
     yield adapter
     
@@ -89,7 +95,7 @@ async def repo_adapter(db_adapter: DatabaseAdapter) -> DatabaseRepositoryAdapter
 @pytest.fixture
 def mock_graph_client() -> AsyncMock:
     """Mock Graph API client."""
-    mock = AsyncMock(spec=GraphAPIAdapter)
+    mock = AsyncMock(spec=GraphAPIClientAdapter)
     
     # Mock common methods
     mock.get_user_info.return_value = {
@@ -114,7 +120,7 @@ def mock_graph_client() -> AsyncMock:
 @pytest.fixture
 def mock_oauth_client() -> AsyncMock:
     """Mock OAuth client."""
-    mock = AsyncMock(spec=OAuthAdapter)
+    mock = AsyncMock(spec=OAuthClientAdapter)
     
     # Mock common methods
     mock.get_authorization_url.return_value = (
@@ -148,6 +154,7 @@ async def auth_usecases(
     """Authentication use cases for testing."""
     return AuthenticationUseCases(
         account_repo=repo_adapter,
+        auth_flow_repo=repo_adapter,
         token_repo=repo_adapter,
         auth_log_repo=repo_adapter,
         oauth_client=mock_oauth_client,
@@ -162,14 +169,19 @@ async def mail_usecases(
     test_settings: Settings
 ) -> MailUseCases:
     """Mail use cases for testing."""
+    mock_external_api_client = AsyncMock()
+    mock_external_api_client.send_mail_data.return_value = {"status": "success"}
+    
     return MailUseCases(
         account_repo=repo_adapter,
         token_repo=repo_adapter,
         mail_repo=repo_adapter,
         query_history_repo=repo_adapter,
+        delta_link_repo=repo_adapter,
         webhook_repo=repo_adapter,
         external_api_repo=repo_adapter,
         graph_client=mock_graph_client,
+        external_api_client=mock_external_api_client,
         config=test_settings
     )
 

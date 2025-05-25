@@ -22,6 +22,7 @@ from adapters.db.models import (
     TokenModel, MailMessageModel, MailQueryHistoryModel, DeltaLinkModel,
     WebhookSubscriptionModel, ExternalAPICallModel, AuthenticationLogModel
 )
+from adapters.db.database import DatabaseAdapter
 
 logger = structlog.get_logger()
 
@@ -102,6 +103,48 @@ class AccountRepository(AccountRepositoryPort):
         stmt = delete(AccountModel).where(AccountModel.id == account_id)
         result = await self.session.execute(stmt)
         return result.rowcount > 0
+    
+    async def search_accounts(self, filters: Dict[str, Any]) -> List[Account]:
+        """Search accounts with filters."""
+        stmt = select(AccountModel)
+        
+        conditions = []
+        
+        # Email filter
+        if "email" in filters and filters["email"]:
+            conditions.append(AccountModel.email.ilike(f"%{filters['email']}%"))
+        
+        # User ID filter
+        if "user_id" in filters and filters["user_id"]:
+            conditions.append(AccountModel.user_id == filters["user_id"])
+        
+        # Tenant ID filter
+        if "tenant_id" in filters and filters["tenant_id"]:
+            conditions.append(AccountModel.tenant_id == filters["tenant_id"])
+        
+        # Authentication flow filter
+        if "authentication_flow" in filters and filters["authentication_flow"]:
+            conditions.append(AccountModel.authentication_flow == filters["authentication_flow"])
+        
+        # Status filter
+        if "status" in filters and filters["status"]:
+            conditions.append(AccountModel.status == filters["status"])
+        
+        # Apply conditions
+        if conditions:
+            stmt = stmt.where(and_(*conditions))
+        
+        # Order by created_at desc
+        stmt = stmt.order_by(AccountModel.created_at.desc())
+        
+        # Apply limit if specified
+        if "limit" in filters and filters["limit"]:
+            stmt = stmt.limit(filters["limit"])
+        
+        result = await self.session.execute(stmt)
+        models = result.scalars().all()
+        
+        return [self._model_to_entity(model) for model in models]
     
     def _model_to_entity(self, model: AccountModel) -> Account:
         """Convert model to entity."""
@@ -279,6 +322,24 @@ class TokenRepository(TokenRepositoryPort):
         stmt = delete(TokenModel).where(TokenModel.account_id == account_id)
         result = await self.session.execute(stmt)
         return result.rowcount > 0
+    
+    async def get_all_tokens(self) -> List[Token]:
+        """Get all tokens."""
+        stmt = select(TokenModel).order_by(TokenModel.created_at.desc())
+        result = await self.session.execute(stmt)
+        models = result.scalars().all()
+        
+        return [self._model_to_entity(model) for model in models]
+    
+    async def get_expired_tokens(self) -> List[Token]:
+        """Get expired tokens."""
+        stmt = select(TokenModel).where(
+            TokenModel.expires_at <= datetime.utcnow()
+        ).order_by(TokenModel.expires_at.asc())
+        result = await self.session.execute(stmt)
+        models = result.scalars().all()
+        
+        return [self._model_to_entity(model) for model in models]
     
     def _model_to_entity(self, model: TokenModel) -> Token:
         """Convert model to entity."""
@@ -703,3 +764,94 @@ class AuthenticationLogRepository(AuthenticationLogRepositoryPort):
             user_agent=model.user_agent,
             timestamp=model.timestamp
         )
+
+
+class DatabaseRepositoryAdapter:
+    """Database repository adapter that implements all repository ports."""
+    
+    def __init__(self, db_adapter: DatabaseAdapter):
+        self.db_adapter = db_adapter
+    
+    async def create_account(self, account: Account) -> Account:
+        """Create account."""
+        async with self.db_adapter.session_scope() as session:
+            repo = AccountRepository(session)
+            return await repo.create_account(account)
+    
+    async def get_account_by_id(self, account_id: str) -> Optional[Account]:
+        """Get account by ID."""
+        async with self.db_adapter.session_scope() as session:
+            repo = AccountRepository(session)
+            return await repo.get_account_by_id(account_id)
+    
+    async def get_account_by_email(self, email: str) -> Optional[Account]:
+        """Get account by email."""
+        async with self.db_adapter.session_scope() as session:
+            repo = AccountRepository(session)
+            return await repo.get_account_by_email(email)
+    
+    async def get_all_accounts(self) -> List[Account]:
+        """Get all accounts."""
+        async with self.db_adapter.session_scope() as session:
+            repo = AccountRepository(session)
+            return await repo.get_all_accounts()
+    
+    async def update_account(self, account: Account) -> Account:
+        """Update account."""
+        async with self.db_adapter.session_scope() as session:
+            repo = AccountRepository(session)
+            return await repo.update_account(account)
+    
+    async def delete_account(self, account_id: str) -> bool:
+        """Delete account."""
+        async with self.db_adapter.session_scope() as session:
+            repo = AccountRepository(session)
+            return await repo.delete_account(account_id)
+    
+    async def create_auth_code_account(self, auth_account: AuthorizationCodeAccount) -> AuthorizationCodeAccount:
+        """Create authorization code account."""
+        async with self.db_adapter.session_scope() as session:
+            repo = AuthFlowRepository(session)
+            return await repo.create_auth_code_account(auth_account)
+    
+    async def get_auth_code_account(self, account_id: str) -> Optional[AuthorizationCodeAccount]:
+        """Get authorization code account."""
+        async with self.db_adapter.session_scope() as session:
+            repo = AuthFlowRepository(session)
+            return await repo.get_auth_code_account(account_id)
+    
+    async def create_device_code_account(self, device_account: DeviceCodeAccount) -> DeviceCodeAccount:
+        """Create device code account."""
+        async with self.db_adapter.session_scope() as session:
+            repo = AuthFlowRepository(session)
+            return await repo.create_device_code_account(device_account)
+    
+    async def get_device_code_account(self, account_id: str) -> Optional[DeviceCodeAccount]:
+        """Get device code account."""
+        async with self.db_adapter.session_scope() as session:
+            repo = AuthFlowRepository(session)
+            return await repo.get_device_code_account(account_id)
+    
+    async def update_device_code_account(self, device_account: DeviceCodeAccount) -> DeviceCodeAccount:
+        """Update device code account."""
+        async with self.db_adapter.session_scope() as session:
+            repo = AuthFlowRepository(session)
+            return await repo.update_device_code_account(device_account)
+    
+    async def save_token(self, token: Token) -> Token:
+        """Save token."""
+        async with self.db_adapter.session_scope() as session:
+            repo = TokenRepository(session)
+            return await repo.save_token(token)
+    
+    async def get_token_by_account_id(self, account_id: str) -> Optional[Token]:
+        """Get token by account ID."""
+        async with self.db_adapter.session_scope() as session:
+            repo = TokenRepository(session)
+            return await repo.get_token_by_account_id(account_id)
+    
+    async def delete_token(self, account_id: str) -> bool:
+        """Delete token."""
+        async with self.db_adapter.session_scope() as session:
+            repo = TokenRepository(session)
+            return await repo.delete_token(account_id)

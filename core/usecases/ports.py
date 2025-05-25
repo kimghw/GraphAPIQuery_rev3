@@ -1,7 +1,7 @@
 """Port interfaces for the Microsoft Graph API Mail Collection System."""
 
 from abc import ABC, abstractmethod
-from typing import List, Optional, Dict, Any, AsyncGenerator
+from typing import List, Optional, Dict, Any, AsyncGenerator, Tuple
 from datetime import datetime
 
 from core.domain.entities import (
@@ -239,92 +239,22 @@ class AuthenticationLogRepositoryPort(ABC):
 
 
 class ExternalAPIRepositoryPort(ABC):
-    """Port for external API call tracking."""
+    """External API repository port."""
     
     @abstractmethod
     async def save_api_call(self, api_call: ExternalAPICall) -> ExternalAPICall:
-        """Save external API call record."""
+        """Save API call record."""
         pass
     
     @abstractmethod
-    async def get_failed_api_calls(self) -> List[ExternalAPICall]:
+    async def get_failed_api_calls(self, limit: Optional[int] = None) -> List[ExternalAPICall]:
         """Get failed API calls for retry."""
         pass
-    
-    @abstractmethod
-    async def update_api_call(self, api_call: ExternalAPICall) -> ExternalAPICall:
-        """Update API call record."""
-        pass
 
 
-class MicrosoftGraphClientPort(ABC):
-    """Port for Microsoft Graph API client."""
-    
-    @abstractmethod
-    async def authenticate_authorization_code(
-        self,
-        client_id: str,
-        client_secret: str,
-        tenant_id: str,
-        scopes: List[str],
-        redirect_uri: str
-    ) -> Dict[str, str]:
-        """Start authorization code flow."""
-        pass
-    
-    @abstractmethod
-    async def authenticate_device_code(
-        self,
-        client_id: str,
-        tenant_id: str,
-        scopes: List[str]
-    ) -> Dict[str, Any]:
-        """Start device code flow."""
-        pass
-    
-    @abstractmethod
-    async def exchange_code_for_token(
-        self,
-        client_id: str,
-        client_secret: str,
-        tenant_id: str,
-        code: str,
-        redirect_uri: str,
-        scopes: List[str]
-    ) -> Dict[str, Any]:
-        """Exchange authorization code for token."""
-        pass
-    
-    @abstractmethod
-    async def poll_device_code(
-        self,
-        client_id: str,
-        tenant_id: str,
-        device_code: str
-    ) -> Dict[str, Any]:
-        """Poll device code for token."""
-        pass
-    
-    @abstractmethod
-    async def refresh_token(
-        self,
-        client_id: str,
-        client_secret: str,
-        tenant_id: str,
-        refresh_token: str,
-        scopes: List[str]
-    ) -> Dict[str, Any]:
-        """Refresh access token."""
-        pass
-    
-    @abstractmethod
-    async def revoke_token(
-        self,
-        access_token: str,
-        user_id: str
-    ) -> bool:
-        """Revoke user sessions."""
-        pass
+# External service ports
+class GraphAPIClientPort(ABC):
+    """Graph API client port."""
     
     @abstractmethod
     async def get_user_info(self, access_token: str) -> Dict[str, Any]:
@@ -332,28 +262,16 @@ class MicrosoftGraphClientPort(ABC):
         pass
     
     @abstractmethod
-    async def get_messages(
+    async def query_messages(
         self,
         access_token: str,
         user_id: str,
-        folder: str = "Inbox",
-        filter_query: Optional[str] = None,
+        filters: Optional[Dict[str, Any]] = None,
         select_fields: Optional[List[str]] = None,
         top: Optional[int] = None,
-        order_by: Optional[str] = None
+        skip: Optional[int] = None
     ) -> Dict[str, Any]:
-        """Get messages from mailbox."""
-        pass
-    
-    @abstractmethod
-    async def get_delta_messages(
-        self,
-        access_token: str,
-        user_id: str,
-        folder: str = "Inbox",
-        delta_token: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Get delta messages for incremental sync."""
+        """Query messages from Graph API."""
         pass
     
     @abstractmethod
@@ -363,49 +281,49 @@ class MicrosoftGraphClientPort(ABC):
         user_id: str,
         message_data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Send email message."""
+        """Send message via Graph API."""
         pass
     
     @abstractmethod
-    async def get_attachments(
+    async def get_delta_messages(
         self,
         access_token: str,
         user_id: str,
-        message_id: str
+        delta_token: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Get message attachments."""
+        """Get delta messages."""
+        pass
+
+
+class OAuthClientPort(ABC):
+    """OAuth client port."""
+    
+    @abstractmethod
+    async def get_authorization_url(
+        self,
+        scopes: List[str],
+        state: Optional[str] = None
+    ) -> Tuple[str, str]:
+        """Get authorization URL and state."""
         pass
     
     @abstractmethod
-    async def create_webhook_subscription(
+    async def exchange_code_for_token(
         self,
-        access_token: str,
-        user_id: str,
-        notification_url: str,
-        resource: str,
-        change_types: List[str],
-        client_state: str
+        code: str,
+        state: str
     ) -> Dict[str, Any]:
-        """Create webhook subscription."""
+        """Exchange authorization code for token."""
         pass
     
     @abstractmethod
-    async def renew_webhook_subscription(
-        self,
-        access_token: str,
-        subscription_id: str,
-        expires_datetime: datetime
-    ) -> Dict[str, Any]:
-        """Renew webhook subscription."""
+    async def refresh_token(self, refresh_token: str) -> Dict[str, Any]:
+        """Refresh access token."""
         pass
     
     @abstractmethod
-    async def delete_webhook_subscription(
-        self,
-        access_token: str,
-        subscription_id: str
-    ) -> bool:
-        """Delete webhook subscription."""
+    async def revoke_token(self, token: str) -> bool:
+        """Revoke token."""
         pass
 
 

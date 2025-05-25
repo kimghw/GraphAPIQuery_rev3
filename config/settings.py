@@ -67,6 +67,19 @@ class Settings(BaseSettings):
         if v.lower() not in ["development", "testing", "production"]:
             raise ValueError("ENVIRONMENT must be one of: development, testing, production")
         return v.lower()
+    
+    def get_microsoft_graph_config(self) -> dict:
+        """Get Microsoft Graph configuration."""
+        return {
+            "client_id": self.CLIENT_ID,
+            "tenant_id": self.TENANT_ID,
+            "client_secret": self.CLIENT_SECRET,
+            "authority": self.AUTHORITY,
+            "redirect_uri": self.REDIRECT_URI,
+            "graph_api_endpoint": self.GRAPH_API_ENDPOINT,
+            "scopes": self.SCOPES,
+            "token_cache_file": self.TOKEN_CACHE_FILE
+        }
 
 
 def get_settings() -> Settings:

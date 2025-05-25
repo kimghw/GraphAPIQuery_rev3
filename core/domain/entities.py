@@ -67,6 +67,8 @@ class AuthorizationCodeAccount(BaseModel):
     client_secret: str
     redirect_uri: str
     authority: str
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     class Config:
         use_enum_values = True
@@ -81,6 +83,8 @@ class DeviceCodeAccount(BaseModel):
     verification_uri: Optional[str] = None
     expires_in: Optional[int] = None
     interval: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     
     class Config:
         use_enum_values = True

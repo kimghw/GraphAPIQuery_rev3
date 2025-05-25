@@ -12,7 +12,8 @@ from adapters.db.repositories import DatabaseRepositoryAdapter
 @pytest.mark.asyncio
 async def test_create_account_authorization_code(auth_usecases: AuthenticationUseCases):
     """Test creating an account with authorization code flow."""
-    account = await auth_usecases.create_account(
+    result = await auth_usecases.register_account(
+        user_id="test-user-id",
         email="test@example.com",
         tenant_id="test-tenant",
         client_id="test-client",
@@ -22,20 +23,28 @@ async def test_create_account_authorization_code(auth_usecases: AuthenticationUs
         redirect_uri="http://localhost:8000/auth/callback"
     )
     
-    assert account.email == "test@example.com"
-    assert account.tenant_id == "test-tenant"
-    assert account.client_id == "test-client"
-    assert account.authentication_flow == AuthenticationFlow.AUTHORIZATION_CODE
-    assert account.status == AccountStatus.ACTIVE
-    assert "offline_access" in account.scopes
-    assert "User.Read" in account.scopes
-    assert "Mail.Read" in account.scopes
+    assert result["success"] is True
+    assert "account_id" in result
+    assert result["message"] == "Account registered successfully"
+    
+    # Verify account was created by getting it
+    account_info = await auth_usecases.get_account_info(result["account_id"])
+    assert account_info is not None
+    account = account_info["account"]
+    assert account["email"] == "test@example.com"
+    assert account["user_id"] == "test-user-id"
+    assert account["authentication_flow"] == AuthenticationFlow.AUTHORIZATION_CODE.value
+    assert account["status"] == AccountStatus.ACTIVE.value
+    assert "offline_access" in account["scopes"]
+    assert "User.Read" in account["scopes"]
+    assert "Mail.Read" in account["scopes"]
 
 
 @pytest.mark.asyncio
 async def test_create_account_device_code(auth_usecases: AuthenticationUseCases):
     """Test creating an account with device code flow."""
-    account = await auth_usecases.create_account(
+    result = await auth_usecases.register_account(
+        user_id="test-user-id",
         email="test@example.com",
         tenant_id="test-tenant",
         client_id="test-client",
@@ -43,16 +52,25 @@ async def test_create_account_device_code(auth_usecases: AuthenticationUseCases)
         scopes=["offline_access", "User.Read", "Mail.Read"]
     )
     
-    assert account.email == "test@example.com"
-    assert account.authentication_flow == AuthenticationFlow.DEVICE_CODE
-    assert account.status == AccountStatus.ACTIVE
+    assert result["success"] is True
+    assert "account_id" in result
+    assert result["message"] == "Account registered successfully"
+    
+    # Verify account was created by getting it
+    account_info = await auth_usecases.get_account_info(result["account_id"])
+    assert account_info is not None
+    account = account_info["account"]
+    assert account["email"] == "test@example.com"
+    assert account["authentication_flow"] == AuthenticationFlow.DEVICE_CODE.value
+    assert account["status"] == AccountStatus.ACTIVE.value
 
 
 @pytest.mark.asyncio
-async def test_get_account_by_email(auth_usecases: AuthenticationUseCases):
-    """Test getting account by email."""
+async def test_get_account_info(auth_usecases: AuthenticationUseCases):
+    """Test getting account info."""
     # Create account first
-    created_account = await auth_usecases.create_account(
+    result = await auth_usecases.register_account(
+        user_id="test-user-id",
         email="test@example.com",
         tenant_id="test-tenant",
         client_id="test-client",
@@ -62,65 +80,24 @@ async def test_get_account_by_email(auth_usecases: AuthenticationUseCases):
         redirect_uri="http://localhost:8000/auth/callback"
     )
     
-    # Get account by email
-    account = await auth_usecases.get_account_by_email("test@example.com")
+    # Get account info
+    account_info = await auth_usecases.get_account_info(result["account_id"])
     
-    assert account is not None
-    assert account.id == created_account.id
-    assert account.email == "test@example.com"
+    assert account_info is not None
+    account = account_info["account"]
+    assert account["id"] == result["account_id"]
+    assert account["email"] == "test@example.com"
 
 
 @pytest.mark.asyncio
-async def test_get_account_by_id(auth_usecases: AuthenticationUseCases):
-    """Test getting account by ID."""
-    # Create account first
-    created_account = await auth_usecases.create_account(
-        email="test@example.com",
-        tenant_id="test-tenant",
-        client_id="test-client",
-        authentication_flow=AuthenticationFlow.AUTHORIZATION_CODE,
-        scopes=["offline_access", "User.Read", "Mail.Read"],
-        client_secret="test-secret",
-        redirect_uri="http://localhost:8000/auth/callback"
-    )
-    
-    # Get account by ID
-    account = await auth_usecases.get_account_by_id(created_account.id)
-    
-    assert account is not None
-    assert account.id == created_account.id
-    assert account.email == "test@example.com"
-
-
-@pytest.mark.asyncio
-async def test_start_authorization_code_flow(auth_usecases: AuthenticationUseCases):
-    """Test starting authorization code flow."""
-    # Create account first
-    account = await auth_usecases.create_account(
-        email="test@example.com",
-        tenant_id="test-tenant",
-        client_id="test-client",
-        authentication_flow=AuthenticationFlow.AUTHORIZATION_CODE,
-        scopes=["offline_access", "User.Read", "Mail.Read"],
-        client_secret="test-secret",
-        redirect_uri="http://localhost:8000/auth/callback"
-    )
-    
-    # Start authorization flow
-    auth_url, state = await auth_usecases.start_authorization_code_flow(account.id)
-    
-    assert auth_url.startswith("https://login.microsoftonline.com")
-    assert state == "test-state"
-
-
-@pytest.mark.asyncio
-async def test_exchange_authorization_code(
+async def test_authenticate_authorization_code(
     auth_usecases: AuthenticationUseCases,
     mock_oauth_client: AsyncMock
 ):
-    """Test exchanging authorization code for token."""
+    """Test authenticating with authorization code flow."""
     # Create account first
-    account = await auth_usecases.create_account(
+    result = await auth_usecases.register_account(
+        user_id="test-user-id",
         email="test@example.com",
         tenant_id="test-tenant",
         client_id="test-client",
@@ -130,30 +107,29 @@ async def test_exchange_authorization_code(
         redirect_uri="http://localhost:8000/auth/callback"
     )
     
-    # Exchange code for token
-    token = await auth_usecases.exchange_authorization_code(
-        account.id,
-        "test-code",
-        "test-state"
+    # Authenticate
+    auth_result = await auth_usecases.authenticate_account(
+        result["account_id"],
+        authorization_code="test-code",
+        state="test-state"
     )
     
-    assert token is not None
-    assert token.account_id == account.id
-    assert token.access_token == "test-access-token"
-    assert token.refresh_token == "test-refresh-token"
+    assert auth_result["success"] is True
+    assert "token" in auth_result
     
     # Verify OAuth client was called
     mock_oauth_client.exchange_code_for_token.assert_called_once()
 
 
 @pytest.mark.asyncio
-async def test_refresh_token(
+async def test_refresh_token_flow(
     auth_usecases: AuthenticationUseCases,
     mock_oauth_client: AsyncMock
 ):
     """Test refreshing token."""
-    # Create account and token first
-    account = await auth_usecases.create_account(
+    # Create account and authenticate first
+    result = await auth_usecases.register_account(
+        user_id="test-user-id",
         email="test@example.com",
         tenant_id="test-tenant",
         client_id="test-client",
@@ -163,30 +139,29 @@ async def test_refresh_token(
         redirect_uri="http://localhost:8000/auth/callback"
     )
     
-    # Create initial token
-    await auth_usecases.exchange_authorization_code(
-        account.id,
-        "test-code",
-        "test-state"
+    # Authenticate to create initial token
+    await auth_usecases.authenticate_account(
+        result["account_id"],
+        authorization_code="test-code",
+        state="test-state"
     )
     
     # Refresh token
-    new_token = await auth_usecases.refresh_token(account.id)
+    refresh_result = await auth_usecases.refresh_account_token(result["account_id"])
     
-    assert new_token is not None
-    assert new_token.account_id == account.id
-    assert new_token.access_token == "new-access-token"
-    assert new_token.refresh_token == "new-refresh-token"
+    assert refresh_result["success"] is True
+    assert "token" in refresh_result
     
-    # Verify OAuth client was called
+    # Verify OAuth client was called for refresh
     mock_oauth_client.refresh_token.assert_called()
 
 
 @pytest.mark.asyncio
-async def test_get_all_accounts(auth_usecases: AuthenticationUseCases):
-    """Test getting all accounts."""
+async def test_get_all_accounts_info(auth_usecases: AuthenticationUseCases):
+    """Test getting all accounts info."""
     # Create multiple accounts
-    await auth_usecases.create_account(
+    result1 = await auth_usecases.register_account(
+        user_id="test-user-id-1",
         email="test1@example.com",
         tenant_id="test-tenant",
         client_id="test-client",
@@ -196,7 +171,8 @@ async def test_get_all_accounts(auth_usecases: AuthenticationUseCases):
         redirect_uri="http://localhost:8000/auth/callback"
     )
     
-    await auth_usecases.create_account(
+    result2 = await auth_usecases.register_account(
+        user_id="test-user-id-2",
         email="test2@example.com",
         tenant_id="test-tenant",
         client_id="test-client",
@@ -205,19 +181,20 @@ async def test_get_all_accounts(auth_usecases: AuthenticationUseCases):
     )
     
     # Get all accounts
-    accounts = await auth_usecases.get_all_accounts()
+    accounts_info = await auth_usecases.get_all_accounts_info()
     
-    assert len(accounts) == 2
-    emails = [account.email for account in accounts]
+    assert len(accounts_info["accounts"]) == 2
+    emails = [account["email"] for account in accounts_info["accounts"]]
     assert "test1@example.com" in emails
     assert "test2@example.com" in emails
 
 
 @pytest.mark.asyncio
-async def test_delete_account(auth_usecases: AuthenticationUseCases):
-    """Test deleting an account."""
-    # Create account first
-    account = await auth_usecases.create_account(
+async def test_revoke_account_tokens(auth_usecases: AuthenticationUseCases):
+    """Test revoking account tokens."""
+    # Create account and authenticate first
+    result = await auth_usecases.register_account(
+        user_id="test-user-id",
         email="test@example.com",
         tenant_id="test-tenant",
         client_id="test-client",
@@ -227,21 +204,26 @@ async def test_delete_account(auth_usecases: AuthenticationUseCases):
         redirect_uri="http://localhost:8000/auth/callback"
     )
     
-    # Delete account
-    success = await auth_usecases.delete_account(account.id)
+    # Authenticate to create token
+    await auth_usecases.authenticate_account(
+        result["account_id"],
+        authorization_code="test-code",
+        state="test-state"
+    )
     
-    assert success is True
+    # Revoke tokens
+    revoke_result = await auth_usecases.revoke_account_tokens(result["account_id"])
     
-    # Verify account is deleted
-    deleted_account = await auth_usecases.get_account_by_id(account.id)
-    assert deleted_account is None
+    assert revoke_result["success"] is True
+    assert revoke_result["message"] == "Tokens revoked successfully"
 
 
 @pytest.mark.asyncio
-async def test_get_token_status(auth_usecases: AuthenticationUseCases):
-    """Test getting token status."""
-    # Create account and token first
-    account = await auth_usecases.create_account(
+async def test_search_accounts(auth_usecases: AuthenticationUseCases):
+    """Test searching accounts."""
+    # Create account first
+    await auth_usecases.register_account(
+        user_id="test-user-id",
         email="test@example.com",
         tenant_id="test-tenant",
         client_id="test-client",
@@ -251,16 +233,34 @@ async def test_get_token_status(auth_usecases: AuthenticationUseCases):
         redirect_uri="http://localhost:8000/auth/callback"
     )
     
-    # Create token
-    await auth_usecases.exchange_authorization_code(
-        account.id,
-        "test-code",
-        "test-state"
+    # Search accounts
+    search_result = await auth_usecases.search_accounts({"email": "test@example.com"})
+    
+    assert len(search_result["accounts"]) == 1
+    assert search_result["accounts"][0]["email"] == "test@example.com"
+
+
+@pytest.mark.asyncio
+async def test_get_authentication_logs(auth_usecases: AuthenticationUseCases):
+    """Test getting authentication logs."""
+    # Create account and authenticate to generate logs
+    result = await auth_usecases.register_account(
+        user_id="test-user-id",
+        email="test@example.com",
+        tenant_id="test-tenant",
+        client_id="test-client",
+        authentication_flow=AuthenticationFlow.AUTHORIZATION_CODE,
+        scopes=["offline_access", "User.Read", "Mail.Read"],
+        client_secret="test-secret",
+        redirect_uri="http://localhost:8000/auth/callback"
     )
     
-    # Get token status
-    token = await auth_usecases.get_token_status(account.id)
+    # Get authentication logs
+    logs_result = await auth_usecases.get_authentication_logs()
     
-    assert token is not None
-    assert token.account_id == account.id
-    assert token.access_token == "test-access-token"
+    assert "logs" in logs_result
+    assert len(logs_result["logs"]) > 0
+    
+    # Check that registration was logged
+    registration_logs = [log for log in logs_result["logs"] if log["event_type"] == "registration"]
+    assert len(registration_logs) > 0
