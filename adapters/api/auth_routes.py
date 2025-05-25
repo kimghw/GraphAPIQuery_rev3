@@ -35,16 +35,17 @@ async def create_account(
 ) -> AccountResponse:
     """Create a new account."""
     try:
-        account = await auth_usecases.create_account(
+        result = await auth_usecases.register_account(
             email=request.email,
-            tenant_id=request.tenant_id,
-            client_id=request.client_id,
+            user_id=request.email,  # Use email as user_id for now
             authentication_flow=request.authentication_flow,
-            scopes=request.scopes,
-            client_secret=request.client_secret,
-            redirect_uri=request.redirect_uri,
-            authority=request.authority
+            scopes=request.scopes
         )
+        
+        # Get the created account
+        account = await auth_usecases.get_account_by_email(request.email)
+        if not account:
+            raise ValueError("Failed to retrieve created account")
         
         return AccountResponse(
             id=account.id,
@@ -269,14 +270,20 @@ async def authenticate(
             )
         
         if account.authentication_flow == AuthenticationFlow.AUTHORIZATION_CODE:
-            auth_url, state = await auth_usecases.start_authorization_code_flow(account.id)
+            result = await auth_usecases.authenticate_account(account.id)
             
-            return AuthorizationUrlResponse(
-                authorization_url=auth_url,
-                state=state,
-                expires_at=datetime.utcnow().replace(hour=23, minute=59, second=59),
-                instructions="Please visit the authorization URL to complete authentication"
-            )
+            if result.get("requires_user_action") and result.get("authorization_url"):
+                return AuthorizationUrlResponse(
+                    authorization_url=result["authorization_url"],
+                    state=result.get("state", ""),
+                    expires_at=datetime.utcnow().replace(hour=23, minute=59, second=59),
+                    instructions=result.get("message", "Please visit the authorization URL to complete authentication")
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to generate authorization URL"
+                )
         
         else:
             raise HTTPException(

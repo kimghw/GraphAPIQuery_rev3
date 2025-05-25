@@ -1,13 +1,13 @@
 """SQLAlchemy models for Microsoft Graph API Mail Collection System."""
 
 import json
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Dict, Any, Optional
 from sqlalchemy import (
     Column, String, DateTime, Boolean, Integer, Text, JSON, 
     ForeignKey, Enum as SQLEnum, Index
 )
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.types import TypeDecorator, VARCHAR
@@ -16,7 +16,8 @@ from core.domain.entities import (
     AuthenticationFlow, AccountStatus, TokenStatus, MailDirection, MailImportance
 )
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    pass
 
 
 class GUID(TypeDecorator):
@@ -73,8 +74,8 @@ class AccountModel(Base):
     authentication_flow = Column(SQLEnum(AuthenticationFlow), nullable=False)
     status = Column(SQLEnum(AccountStatus), nullable=False, default=AccountStatus.ACTIVE)
     scopes = Column(JSONType, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, nullable=True, onupdate=lambda: datetime.now(UTC))
     last_authenticated_at = Column(DateTime, nullable=True)
 
     # Relationships
@@ -102,7 +103,7 @@ class AuthorizationCodeAccountModel(Base):
     client_secret = Column(String(255), nullable=False)
     redirect_uri = Column(String(500), nullable=False)
     authority = Column(String(500), nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
 
     # Relationships
     account = relationship("AccountModel", back_populates="auth_code_account")
@@ -118,8 +119,8 @@ class DeviceCodeAccountModel(Base):
     verification_uri = Column(String(500), nullable=True)
     expires_in = Column(Integer, nullable=True)
     interval = Column(Integer, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, nullable=True, onupdate=lambda: datetime.now(UTC))
 
     # Relationships
     account = relationship("AccountModel", back_populates="device_code_account")
@@ -136,8 +137,8 @@ class TokenModel(Base):
     expires_at = Column(DateTime, nullable=False)
     scopes = Column(JSONType, nullable=False)
     status = Column(SQLEnum(TokenStatus), nullable=False, default=TokenStatus.VALID)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    updated_at = Column(DateTime, nullable=True, onupdate=lambda: datetime.now(UTC))
 
     # Relationships
     account = relationship("AccountModel", back_populates="tokens")
@@ -173,7 +174,7 @@ class MailMessageModel(Base):
     sent_datetime = Column(DateTime, nullable=True)
     direction = Column(SQLEnum(MailDirection), nullable=False)
     categories = Column(JSONType, nullable=True)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
 
     # Relationships
     account = relationship("AccountModel", back_populates="mail_messages")
@@ -201,7 +202,7 @@ class MailQueryHistoryModel(Base):
     query_parameters = Column(JSONType, nullable=False)
     messages_found = Column(Integer, nullable=False, default=0)
     new_messages = Column(Integer, nullable=False, default=0)
-    query_datetime = Column(DateTime, nullable=False, default=datetime.utcnow)
+    query_datetime = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     execution_time_ms = Column(Integer, nullable=True)
     success = Column(Boolean, nullable=False, default=True)
     error_message = Column(Text, nullable=True)
@@ -225,8 +226,8 @@ class DeltaLinkModel(Base):
     account_id = Column(GUID, ForeignKey("accounts.id"), nullable=False)
     folder_id = Column(String(255), nullable=False)
     delta_token = Column(Text, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    last_used_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
+    last_used_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     is_active = Column(Boolean, nullable=False, default=True)
 
     # Relationships
@@ -251,7 +252,7 @@ class WebhookSubscriptionModel(Base):
     notification_url = Column(String(500), nullable=False)
     client_state = Column(String(255), nullable=False)
     expires_datetime = Column(DateTime, nullable=False)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     is_active = Column(Boolean, nullable=False, default=True)
 
     # Relationships
@@ -277,7 +278,7 @@ class ExternalAPICallModel(Base):
     response_body = Column(Text, nullable=True)
     success = Column(Boolean, nullable=True)
     retry_count = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
     completed_at = Column(DateTime, nullable=True)
 
     # Relationships
@@ -304,7 +305,7 @@ class AuthenticationLogModel(Base):
     error_message = Column(Text, nullable=True)
     ip_address = Column(String(45), nullable=True)
     user_agent = Column(Text, nullable=True)
-    timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
+    timestamp = Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
 
     # Relationships
     account = relationship("AccountModel", back_populates="auth_logs")

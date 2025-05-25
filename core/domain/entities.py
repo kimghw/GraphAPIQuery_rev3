@@ -1,9 +1,9 @@
 """Domain entities for the Microsoft Graph API Mail Collection System."""
 
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Optional, Dict, Any
 from enum import Enum
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
 
 class AuthenticationFlow(str, Enum):
@@ -56,8 +56,7 @@ class Account(BaseModel):
     updated_at: Optional[datetime] = None
     last_authenticated_at: Optional[datetime] = None
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class AuthorizationCodeAccount(BaseModel):
@@ -70,8 +69,7 @@ class AuthorizationCodeAccount(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class DeviceCodeAccount(BaseModel):
@@ -86,8 +84,7 @@ class DeviceCodeAccount(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class Token(BaseModel):
@@ -104,18 +101,17 @@ class Token(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
     
     @property
     def is_expired(self) -> bool:
         """Check if token is expired."""
-        return datetime.utcnow() >= self.expires_at
+        return datetime.now(UTC) >= self.expires_at
     
     @property
     def expires_in_seconds(self) -> int:
         """Get seconds until token expires."""
-        delta = self.expires_at - datetime.utcnow()
+        delta = self.expires_at - datetime.now(UTC)
         return max(0, int(delta.total_seconds()))
 
 
@@ -146,8 +142,7 @@ class MailMessage(BaseModel):
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class MailAttachment(BaseModel):
@@ -165,8 +160,7 @@ class MailAttachment(BaseModel):
     storage_url: Optional[str] = None  # For large attachments stored externally
     created_at: Optional[datetime] = None
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class MailQueryHistory(BaseModel):
@@ -183,8 +177,7 @@ class MailQueryHistory(BaseModel):
     success: bool = True
     error_message: Optional[str] = None
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class DeltaLink(BaseModel):
@@ -199,8 +192,7 @@ class DeltaLink(BaseModel):
     last_used_at: Optional[datetime] = None
     is_active: bool = True
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class WebhookSubscription(BaseModel):
@@ -217,8 +209,7 @@ class WebhookSubscription(BaseModel):
     created_at: Optional[datetime] = None
     is_active: bool = True
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class AuthenticationLog(BaseModel):
@@ -235,8 +226,7 @@ class AuthenticationLog(BaseModel):
     user_agent: Optional[str] = None
     timestamp: datetime
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class ExternalAPICall(BaseModel):
@@ -256,8 +246,7 @@ class ExternalAPICall(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime] = None
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class NotificationRule(BaseModel):
@@ -274,5 +263,4 @@ class NotificationRule(BaseModel):
     is_active: bool = True
     created_at: Optional[datetime] = None
     
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)

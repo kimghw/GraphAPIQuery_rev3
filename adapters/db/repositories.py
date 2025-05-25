@@ -1,6 +1,6 @@
 """Database repository implementations."""
 
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Optional, Dict, Any
 from sqlalchemy import select, update, delete, and_, or_, desc, asc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -90,7 +90,7 @@ class AccountRepository(AccountRepositoryPort):
                 authentication_flow=account.authentication_flow,
                 status=account.status,
                 scopes=account.scopes,
-                updated_at=datetime.utcnow(),
+                updated_at=datetime.now(UTC),
                 last_authenticated_at=account.last_authenticated_at
             )
         )
@@ -232,7 +232,7 @@ class AuthFlowRepository(AuthFlowRepositoryPort):
                 verification_uri=device_account.verification_uri,
                 expires_in=device_account.expires_in,
                 interval=device_account.interval,
-                updated_at=datetime.utcnow()
+                updated_at=datetime.now(UTC)
             )
         )
         
@@ -288,7 +288,7 @@ class TokenRepository(TokenRepositoryPort):
                     expires_at=token.expires_at,
                     scopes=token.scopes,
                     status=token.status,
-                    updated_at=datetime.utcnow()
+                    updated_at=datetime.now(UTC)
                 )
             )
             await self.session.execute(stmt)
@@ -334,7 +334,7 @@ class TokenRepository(TokenRepositoryPort):
     async def get_expired_tokens(self) -> List[Token]:
         """Get expired tokens."""
         stmt = select(TokenModel).where(
-            TokenModel.expires_at <= datetime.utcnow()
+            TokenModel.expires_at <= datetime.now(UTC)
         ).order_by(TokenModel.expires_at.asc())
         result = await self.session.execute(stmt)
         models = result.scalars().all()

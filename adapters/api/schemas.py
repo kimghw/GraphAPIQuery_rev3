@@ -81,7 +81,7 @@ class AuthenticationRequest(BaseModel):
 class AuthorizationUrlResponse(BaseResponse):
     """Authorization URL response schema."""
     authorization_url: str
-    state: str
+    state: Optional[str] = None
     expires_at: datetime
     instructions: str = "Please visit the authorization URL to complete authentication"
 

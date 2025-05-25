@@ -49,6 +49,11 @@ app = typer.Typer(
 # Sub-commands
 auth_app = typer.Typer(name="auth", help="Authentication commands")
 mail_app = typer.Typer(name="mail", help="Mail commands")
+
+# Import and add config commands
+from adapters.cli.config_commands import app as config_app
+app.add_typer(config_app, name="config")
+
 app.add_typer(auth_app)
 app.add_typer(mail_app)
 

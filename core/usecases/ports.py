@@ -379,6 +379,51 @@ class CacheServicePort(ABC):
         pass
 
 
+class CachePort(ABC):
+    """Enhanced cache port for advanced caching operations."""
+    
+    @abstractmethod
+    async def connect(self):
+        """Establish cache connection."""
+        pass
+    
+    @abstractmethod
+    async def disconnect(self):
+        """Close cache connection."""
+        pass
+    
+    @abstractmethod
+    async def get(self, key: str, prefix: str = "") -> Optional[Any]:
+        """Get value from cache."""
+        pass
+    
+    @abstractmethod
+    async def set(
+        self,
+        key: str,
+        value: Any,
+        ttl: Optional[int] = None,
+        prefix: str = ""
+    ) -> bool:
+        """Set value in cache."""
+        pass
+    
+    @abstractmethod
+    async def delete(self, key: str, prefix: str = "") -> bool:
+        """Delete value from cache."""
+        pass
+    
+    @abstractmethod
+    async def exists(self, key: str, prefix: str = "") -> bool:
+        """Check if key exists in cache."""
+        pass
+    
+    @abstractmethod
+    async def get_health_status(self) -> Dict[str, Any]:
+        """Get cache health status."""
+        pass
+
+
 class ConfigPort(ABC):
     """Port for configuration management."""
     

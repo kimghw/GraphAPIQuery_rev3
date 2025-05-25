@@ -15,8 +15,6 @@ async def test_create_account_authorization_code(auth_usecases: AuthenticationUs
     result = await auth_usecases.register_account(
         user_id="test-user-id",
         email="test@example.com",
-        tenant_id="test-tenant",
-        client_id="test-client",
         authentication_flow=AuthenticationFlow.AUTHORIZATION_CODE,
         scopes=["offline_access", "User.Read", "Mail.Read"],
         client_secret="test-secret",
@@ -46,8 +44,6 @@ async def test_create_account_device_code(auth_usecases: AuthenticationUseCases)
     result = await auth_usecases.register_account(
         user_id="test-user-id",
         email="test@example.com",
-        tenant_id="test-tenant",
-        client_id="test-client",
         authentication_flow=AuthenticationFlow.DEVICE_CODE,
         scopes=["offline_access", "User.Read", "Mail.Read"]
     )
@@ -72,8 +68,6 @@ async def test_get_account_info(auth_usecases: AuthenticationUseCases):
     result = await auth_usecases.register_account(
         user_id="test-user-id",
         email="test@example.com",
-        tenant_id="test-tenant",
-        client_id="test-client",
         authentication_flow=AuthenticationFlow.AUTHORIZATION_CODE,
         scopes=["offline_access", "User.Read", "Mail.Read"],
         client_secret="test-secret",
@@ -99,8 +93,6 @@ async def test_authenticate_authorization_code(
     result = await auth_usecases.register_account(
         user_id="test-user-id",
         email="test@example.com",
-        tenant_id="test-tenant",
-        client_id="test-client",
         authentication_flow=AuthenticationFlow.AUTHORIZATION_CODE,
         scopes=["offline_access", "User.Read", "Mail.Read"],
         client_secret="test-secret",
@@ -115,7 +107,8 @@ async def test_authenticate_authorization_code(
     )
     
     assert auth_result["success"] is True
-    assert "token" in auth_result
+    assert auth_result["requires_user_action"] is False
+    assert "message" in auth_result
     
     # Verify OAuth client was called
     mock_oauth_client.exchange_code_for_token.assert_called_once()
@@ -131,8 +124,6 @@ async def test_refresh_token_flow(
     result = await auth_usecases.register_account(
         user_id="test-user-id",
         email="test@example.com",
-        tenant_id="test-tenant",
-        client_id="test-client",
         authentication_flow=AuthenticationFlow.AUTHORIZATION_CODE,
         scopes=["offline_access", "User.Read", "Mail.Read"],
         client_secret="test-secret",
@@ -150,7 +141,7 @@ async def test_refresh_token_flow(
     refresh_result = await auth_usecases.refresh_account_token(result["account_id"])
     
     assert refresh_result["success"] is True
-    assert "token" in refresh_result
+    assert "message" in refresh_result
     
     # Verify OAuth client was called for refresh
     mock_oauth_client.refresh_token.assert_called()
@@ -163,8 +154,6 @@ async def test_get_all_accounts_info(auth_usecases: AuthenticationUseCases):
     result1 = await auth_usecases.register_account(
         user_id="test-user-id-1",
         email="test1@example.com",
-        tenant_id="test-tenant",
-        client_id="test-client",
         authentication_flow=AuthenticationFlow.AUTHORIZATION_CODE,
         scopes=["offline_access", "User.Read", "Mail.Read"],
         client_secret="test-secret",
@@ -174,17 +163,15 @@ async def test_get_all_accounts_info(auth_usecases: AuthenticationUseCases):
     result2 = await auth_usecases.register_account(
         user_id="test-user-id-2",
         email="test2@example.com",
-        tenant_id="test-tenant",
-        client_id="test-client",
         authentication_flow=AuthenticationFlow.DEVICE_CODE,
         scopes=["offline_access", "User.Read", "Mail.Read"]
     )
     
-    # Get all accounts
+    # Get all accounts - returns a list directly
     accounts_info = await auth_usecases.get_all_accounts_info()
     
-    assert len(accounts_info["accounts"]) == 2
-    emails = [account["email"] for account in accounts_info["accounts"]]
+    assert len(accounts_info) == 2
+    emails = [acc["account"]["email"] for acc in accounts_info]
     assert "test1@example.com" in emails
     assert "test2@example.com" in emails
 
@@ -196,8 +183,6 @@ async def test_revoke_account_tokens(auth_usecases: AuthenticationUseCases):
     result = await auth_usecases.register_account(
         user_id="test-user-id",
         email="test@example.com",
-        tenant_id="test-tenant",
-        client_id="test-client",
         authentication_flow=AuthenticationFlow.AUTHORIZATION_CODE,
         scopes=["offline_access", "User.Read", "Mail.Read"],
         client_secret="test-secret",
@@ -215,7 +200,7 @@ async def test_revoke_account_tokens(auth_usecases: AuthenticationUseCases):
     revoke_result = await auth_usecases.revoke_account_tokens(result["account_id"])
     
     assert revoke_result["success"] is True
-    assert revoke_result["message"] == "Tokens revoked successfully"
+    assert revoke_result["message"] == "Token revoked successfully"
 
 
 @pytest.mark.asyncio
@@ -225,19 +210,17 @@ async def test_search_accounts(auth_usecases: AuthenticationUseCases):
     await auth_usecases.register_account(
         user_id="test-user-id",
         email="test@example.com",
-        tenant_id="test-tenant",
-        client_id="test-client",
         authentication_flow=AuthenticationFlow.AUTHORIZATION_CODE,
         scopes=["offline_access", "User.Read", "Mail.Read"],
         client_secret="test-secret",
         redirect_uri="http://localhost:8000/auth/callback"
     )
     
-    # Search accounts
+    # Search accounts - returns a list directly
     search_result = await auth_usecases.search_accounts({"email": "test@example.com"})
     
-    assert len(search_result["accounts"]) == 1
-    assert search_result["accounts"][0]["email"] == "test@example.com"
+    assert len(search_result) == 1
+    assert search_result[0]["account"]["email"] == "test@example.com"
 
 
 @pytest.mark.asyncio
@@ -247,20 +230,18 @@ async def test_get_authentication_logs(auth_usecases: AuthenticationUseCases):
     result = await auth_usecases.register_account(
         user_id="test-user-id",
         email="test@example.com",
-        tenant_id="test-tenant",
-        client_id="test-client",
         authentication_flow=AuthenticationFlow.AUTHORIZATION_CODE,
         scopes=["offline_access", "User.Read", "Mail.Read"],
         client_secret="test-secret",
         redirect_uri="http://localhost:8000/auth/callback"
     )
     
-    # Get authentication logs
+    # Get authentication logs - returns a list directly
     logs_result = await auth_usecases.get_authentication_logs()
     
-    assert "logs" in logs_result
-    assert len(logs_result["logs"]) > 0
+    assert isinstance(logs_result, list)
+    assert len(logs_result) > 0
     
     # Check that registration was logged
-    registration_logs = [log for log in logs_result["logs"] if log["event_type"] == "registration"]
+    registration_logs = [log for log in logs_result if log.event_type == "registration"]
     assert len(registration_logs) > 0

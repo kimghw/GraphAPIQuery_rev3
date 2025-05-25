@@ -1,7 +1,7 @@
 """Authentication use cases for Microsoft Graph API Mail Collection System."""
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Dict, Any, Optional, List
 import structlog
 
@@ -64,7 +64,7 @@ class AuthenticationUseCases:
                 authentication_flow=authentication_flow,
                 status=AccountStatus.ACTIVE,
                 scopes=scopes,
-                created_at=datetime.utcnow()
+                created_at=datetime.now(UTC)
             )
             
             # Save account
@@ -77,7 +77,7 @@ class AuthenticationUseCases:
                     client_secret=graph_config["client_secret"],
                     redirect_uri=graph_config["redirect_uri"],
                     authority=graph_config["authority"],
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(UTC)
                 )
                 await self.auth_flow_repo.create_auth_code_account(auth_code_account)
                 
@@ -143,7 +143,7 @@ class AuthenticationUseCases:
                 token_status = "none"
             
             return {
-                "account": account.dict(),
+                "account": account.model_dump(),
                 "token_status": token_status,
                 "token_expires_in": token.expires_in_seconds if token else None
             }
@@ -175,7 +175,7 @@ class AuthenticationUseCases:
                     token_status = "none"
                 
                 result.append({
-                    "account": account.dict(),
+                    "account": account.model_dump(),
                     "token_status": token_status,
                     "token_expires_in": token.expires_in_seconds if token else None
                 })
@@ -184,6 +184,14 @@ class AuthenticationUseCases:
             
         except Exception as e:
             logger.error("Failed to get all accounts", error=str(e))
+            raise
+    
+    async def get_account_by_email(self, email: str) -> Optional[Account]:
+        """Get account by email address."""
+        try:
+            return await self.account_repo.get_account_by_email(email)
+        except Exception as e:
+            logger.error("Failed to get account by email", email=email, error=str(e))
             raise
     
     async def authenticate_account(
@@ -258,7 +266,7 @@ class AuthenticationUseCases:
             await self._save_token(account.id, token_data)
             
             # Update account last authenticated time
-            account.last_authenticated_at = datetime.utcnow()
+            account.last_authenticated_at = datetime.now(UTC)
             await self.account_repo.update_account(account)
             
             # Log successful authentication
@@ -331,7 +339,7 @@ class AuthenticationUseCases:
                 await self._save_token(account.id, token_data)
                 
                 # Update account last authenticated time
-                account.last_authenticated_at = datetime.utcnow()
+                account.last_authenticated_at = datetime.now(UTC)
                 await self.account_repo.update_account(account)
                 
                 # Log successful authentication
@@ -490,7 +498,7 @@ class AuthenticationUseCases:
     async def _save_token(self, account_id: str, token_data: Dict[str, Any]) -> Token:
         """Save token data to repository."""
         expires_in = token_data.get("expires_in", 3600)
-        expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+        expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
         
         token = Token(
             account_id=account_id,
@@ -500,7 +508,7 @@ class AuthenticationUseCases:
             expires_at=expires_at,
             scopes=token_data.get("scope", "").split(" ") if token_data.get("scope") else [],
             status=TokenStatus.VALID,
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         
         return await self.token_repo.save_token(token)
@@ -527,7 +535,7 @@ class AuthenticationUseCases:
                 error_message=error_message,
                 ip_address=ip_address,
                 user_agent=user_agent,
-                timestamp=datetime.utcnow()
+                timestamp=datetime.now(UTC)
             )
             
             await self.auth_log_repo.save_auth_log(log)
@@ -539,3 +547,37 @@ class AuthenticationUseCases:
                 event_type=event_type,
                 error=str(e)
             )
+    
+    # Additional methods needed by tests
+    async def get_all_accounts_info(self) -> List[Dict[str, Any]]:
+        """Get all accounts info - alias for get_all_accounts."""
+        return await self.get_all_accounts()
+    
+    async def refresh_account_token(self, account_id: str) -> Dict[str, Any]:
+        """Refresh account token - alias for refresh_token."""
+        return await self.refresh_token(account_id)
+    
+    async def revoke_account_tokens(self, account_id: str) -> Dict[str, Any]:
+        """Revoke account tokens - alias for revoke_token."""
+        return await self.revoke_token(account_id)
+    
+    async def search_accounts(self, criteria: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Search accounts by criteria."""
+        try:
+            # Simple implementation - can be enhanced later
+            all_accounts = await self.get_all_accounts()
+            
+            # Filter by email if provided
+            if "email" in criteria:
+                email_filter = criteria["email"].lower()
+                filtered_accounts = [
+                    acc for acc in all_accounts 
+                    if email_filter in acc["account"]["email"].lower()
+                ]
+                return filtered_accounts
+            
+            return all_accounts
+            
+        except Exception as e:
+            logger.error("Failed to search accounts", criteria=criteria, error=str(e))
+            raise
