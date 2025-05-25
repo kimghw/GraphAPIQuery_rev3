@@ -179,7 +179,7 @@ class SendMailRequest(BaseModel):
     to_recipients: List[EmailStr]
     subject: str
     body: str
-    body_type: str = Field(default="text", regex="^(text|html)$")
+    body_type: str = Field(default="text", pattern="^(text|html)$")
     cc_recipients: Optional[List[EmailStr]] = None
     bcc_recipients: Optional[List[EmailStr]] = None
     save_to_sent_items: bool = True

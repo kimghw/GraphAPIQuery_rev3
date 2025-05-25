@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.openapi.utils import get_openapi
+from sqlalchemy import text
 
 from config.settings import get_settings
 from adapters.db.database import get_database_adapter, migrate_database
@@ -60,7 +61,7 @@ async def lifespan(app: FastAPI):
         # Test database connection
         db_adapter = get_database_adapter(settings)
         async with db_adapter.session_scope() as session:
-            await session.execute("SELECT 1")
+            await session.execute(text("SELECT 1"))
         logger.info("Database connection verified")
         
         yield
@@ -252,7 +253,7 @@ async def health_check() -> HealthCheckResponse:
     try:
         db_adapter = get_database_adapter(settings)
         async with db_adapter.session_scope() as session:
-            await session.execute("SELECT 1")
+            await session.execute(text("SELECT 1"))
         services["database"] = "healthy"
     except Exception as e:
         logger.error("Database health check failed", error=str(e))
