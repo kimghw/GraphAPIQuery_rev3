@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 
-from config.settings import Settings
+from config.settings import Settings, get_settings
 
 logger = structlog.get_logger()
 
@@ -53,9 +53,9 @@ class DatabaseAdapter:
             else:
                 self._async_engine = create_async_engine(
                     async_url,
-                    pool_size=self.settings.DATABASE_POOL_SIZE,
-                    max_overflow=self.settings.DATABASE_MAX_OVERFLOW,
-                    pool_timeout=self.settings.DATABASE_POOL_TIMEOUT,
+                    pool_size=5,
+                    max_overflow=10,
+                    pool_timeout=30,
                     echo=self.settings.DATABASE_ECHO
                 )
             
@@ -70,9 +70,9 @@ class DatabaseAdapter:
             else:
                 self._sync_engine = create_engine(
                     self.settings.DATABASE_URL,
-                    pool_size=self.settings.DATABASE_POOL_SIZE,
-                    max_overflow=self.settings.DATABASE_MAX_OVERFLOW,
-                    pool_timeout=self.settings.DATABASE_POOL_TIMEOUT,
+                    pool_size=5,
+                    max_overflow=10,
+                    pool_timeout=30,
                     echo=self.settings.DATABASE_ECHO
                 )
             
@@ -188,7 +188,6 @@ def get_database_adapter(settings: Optional[Settings] = None) -> DatabaseAdapter
     
     if _database_adapter is None:
         if settings is None:
-            from config.settings import get_settings
             settings = get_settings()
         _database_adapter = DatabaseAdapter(settings)
     
@@ -238,9 +237,9 @@ def migrate_database_sync(settings: Settings) -> None:
             else:
                 adapter._sync_engine = create_engine(
                     settings.DATABASE_URL,
-                    pool_size=settings.DATABASE_POOL_SIZE,
-                    max_overflow=settings.DATABASE_MAX_OVERFLOW,
-                    pool_timeout=settings.DATABASE_POOL_TIMEOUT,
+                    pool_size=5,
+                    max_overflow=10,
+                    pool_timeout=30,
                     echo=settings.DATABASE_ECHO
                 )
         
