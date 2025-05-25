@@ -160,3 +160,59 @@ class DatabaseRepositoryAdapter:
         async with self.db_adapter.session_scope() as session:
             repo = AuthenticationLogRepository(session)
             return await repo.save_auth_log(log)
+    
+    async def get_auth_logs(
+        self,
+        account_id: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        success: Optional[bool] = None,
+        limit: Optional[int] = None
+    ) -> List[AuthenticationLog]:
+        """Get authentication logs."""
+        async with self.db_adapter.session_scope() as session:
+            repo = AuthenticationLogRepository(session)
+            return await repo.get_auth_logs(account_id, date_from, date_to, success, limit)
+    
+    # Delta link methods
+    async def save_delta_link(self, delta_link: DeltaLink) -> DeltaLink:
+        """Save delta link."""
+        async with self.db_adapter.session_scope() as session:
+            repo = DeltaLinkRepository(session)
+            return await repo.save_delta_link(delta_link)
+    
+    async def get_delta_link(self, account_id: str, folder_id: str) -> Optional[DeltaLink]:
+        """Get delta link."""
+        async with self.db_adapter.session_scope() as session:
+            repo = DeltaLinkRepository(session)
+            return await repo.get_delta_link(account_id, folder_id)
+    
+    # Webhook methods
+    async def save_webhook_subscription(self, subscription: WebhookSubscription) -> WebhookSubscription:
+        """Save webhook subscription."""
+        async with self.db_adapter.session_scope() as session:
+            repo = WebhookRepository(session)
+            return await repo.save_webhook_subscription(subscription)
+    
+    async def get_webhook_subscription(self, subscription_id: str) -> Optional[WebhookSubscription]:
+        """Get webhook subscription."""
+        async with self.db_adapter.session_scope() as session:
+            repo = WebhookRepository(session)
+            return await repo.get_webhook_subscription(subscription_id)
+    
+    # External API methods
+    async def save_external_api_call(self, api_call: ExternalAPICall) -> ExternalAPICall:
+        """Save external API call."""
+        async with self.db_adapter.session_scope() as session:
+            repo = ExternalAPIRepository(session)
+            return await repo.save_external_api_call(api_call)
+    
+    async def get_external_api_calls(
+        self,
+        account_id: Optional[str] = None,
+        limit: Optional[int] = None
+    ) -> List[ExternalAPICall]:
+        """Get external API calls."""
+        async with self.db_adapter.session_scope() as session:
+            repo = ExternalAPIRepository(session)
+            return await repo.get_external_api_calls(account_id, limit)

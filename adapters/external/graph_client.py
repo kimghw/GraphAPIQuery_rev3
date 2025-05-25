@@ -1,5 +1,6 @@
 """Microsoft Graph API client adapter."""
 
+import asyncio
 import json
 import uuid
 from datetime import datetime, timedelta
@@ -459,6 +460,48 @@ class GraphAPIClientAdapter(GraphAPIClientPort):
                 user_id=user_id
             )
             return False
+    
+    async def query_messages(
+        self,
+        token: Token,
+        account_id: str,
+        folder_id: str = "inbox",
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+        sender_email: Optional[str] = None,
+        is_read: Optional[bool] = None,
+        search: Optional[str] = None,
+        top: Optional[int] = None
+    ) -> List[MailMessage]:
+        """Query messages and return as MailMessage entities."""
+        # Build filters
+        filters = {}
+        if date_from:
+            filters["date_from"] = date_from.isoformat() + "Z"
+        if date_to:
+            filters["date_to"] = date_to.isoformat() + "Z"
+        if sender_email:
+            filters["sender_email"] = sender_email
+        if is_read is not None:
+            filters["is_read"] = is_read
+        if search:
+            filters["search"] = search
+        
+        # Get messages from Graph API
+        messages_data, _ = await self.get_messages(
+            token=token,
+            folder_id=folder_id,
+            filters=filters,
+            top=top
+        )
+        
+        # Parse to MailMessage entities
+        mail_messages = []
+        for message_data in messages_data:
+            mail_message = self._parse_graph_message(message_data, account_id)
+            mail_messages.append(mail_message)
+        
+        return mail_messages
     
     def _parse_graph_message(self, message_data: Dict[str, Any], account_id: str) -> MailMessage:
         """Parse Graph API message data to MailMessage entity."""

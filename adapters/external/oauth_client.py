@@ -42,6 +42,7 @@ class OAuthClientAdapter(OAuthClientPort):
     async def get_authorization_url(
         self,
         auth_account: AuthorizationCodeAccount,
+        account: Account,
         scopes: list[str],
         state: Optional[str] = None
     ) -> Tuple[str, str]:
@@ -54,7 +55,7 @@ class OAuthClientAdapter(OAuthClientPort):
         code_challenge = code_verifier  # For simplicity, using plain method
         
         params = {
-            "client_id": auth_account.account.client_id,
+            "client_id": account.client_id,
             "response_type": "code",
             "redirect_uri": auth_account.redirect_uri,
             "scope": " ".join(scopes),
@@ -64,12 +65,12 @@ class OAuthClientAdapter(OAuthClientPort):
             "response_mode": "query"
         }
         
-        auth_url = f"{self._get_authority_url(auth_account.account.tenant_id)}/oauth2/v2.0/authorize"
+        auth_url = f"{self._get_authority_url(account.tenant_id)}/oauth2/v2.0/authorize"
         full_url = f"{auth_url}?{urlencode(params)}"
         
         logger.info(
             "Generated authorization URL",
-            client_id=auth_account.account.client_id,
+            client_id=account.client_id,
             redirect_uri=auth_account.redirect_uri,
             scopes=scopes
         )

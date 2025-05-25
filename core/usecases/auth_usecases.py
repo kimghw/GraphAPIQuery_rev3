@@ -222,16 +222,20 @@ class AuthenticationUseCases:
     async def _authenticate_authorization_code(
         self,
         account: Account,
-        code: Optional[str] = None
+        authorization_code: Optional[str] = None,
+        state: Optional[str] = None,
+        **kwargs
     ) -> Dict[str, Any]:
         """Handle authorization code flow authentication."""
         auth_data = await self.auth_flow_repo.get_auth_code_account(account.id)
         if not auth_data:
             raise ValueError("Authorization code account data not found")
         
-        if not code:
+        if not authorization_code:
             # Generate authorization URL
-            auth_url, state = await self.oauth_client.get_authorization_url(
+            auth_url, code_verifier = await self.oauth_client.get_authorization_url(
+                auth_account=auth_data,
+                account=account,
                 scopes=account.scopes,
                 state=None
             )
@@ -246,8 +250,8 @@ class AuthenticationUseCases:
         else:
             # Exchange code for token
             token_data = await self.oauth_client.exchange_code_for_token(
-                code=code,
-                state=""  # State should be validated here
+                code=authorization_code,
+                state=state or ""  # State should be validated here
             )
             
             # Save token

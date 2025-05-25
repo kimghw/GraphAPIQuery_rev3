@@ -16,11 +16,11 @@ import structlog
 from config.settings import get_settings
 from adapters.db.database import get_database_adapter, migrate_database_sync
 from adapters.db.repositories import DatabaseRepositoryAdapter
-from adapters.external.graph_client import GraphAPIAdapter
-from adapters.external.oauth_client import OAuthAdapter
+from adapters.external.graph_client import GraphAPIClientAdapter
+from adapters.external.oauth_client import OAuthClientAdapter
 from core.usecases.auth_usecases import AuthenticationUseCases
 from core.usecases.mail_usecases import MailUseCases
-from core.domain.entities import AuthenticationFlow, AccountStatus
+from core.domain.entities import AuthenticationFlow, AccountStatus, Account
 
 # Configure logging for CLI
 structlog.configure(
@@ -60,14 +60,15 @@ def get_usecases():
     # Initialize adapters
     db_adapter = get_database_adapter(settings)
     repo_adapter = DatabaseRepositoryAdapter(db_adapter)
-    graph_adapter = GraphAPIAdapter(settings)
-    oauth_adapter = OAuthAdapter(settings)
+    graph_adapter = GraphAPIClientAdapter(settings)
+    oauth_adapter = OAuthClientAdapter(settings)
     
     # Initialize use cases
     auth_usecases = AuthenticationUseCases(
         account_repo=repo_adapter,
         token_repo=repo_adapter,
         auth_log_repo=repo_adapter,
+        auth_flow_repo=repo_adapter,
         oauth_client=oauth_adapter,
         config=settings
     )
@@ -79,6 +80,8 @@ def get_usecases():
         query_history_repo=repo_adapter,
         webhook_repo=repo_adapter,
         external_api_repo=repo_adapter,
+        delta_link_repo=repo_adapter,
+        external_api_client=graph_adapter,  # Using graph_adapter as external API client
         graph_client=graph_adapter,
         config=settings
     )
@@ -180,22 +183,18 @@ def create_account(
         ) as progress:
             task = progress.add_task("Creating account...", total=None)
             
-            account = asyncio.run(auth_usecases.create_account(
+            result = asyncio.run(auth_usecases.register_account(
                 email=email,
-                tenant_id=tenant_id,
-                client_id=client_id,
+                user_id=email,  # Use email as user_id for simplicity
                 authentication_flow=auth_flow,
-                scopes=["offline_access", "User.Read", "Mail.Read", "Mail.ReadWrite", "Mail.Send"],
-                client_secret=client_secret,
-                redirect_uri=redirect_uri
+                scopes=["offline_access", "User.Read", "Mail.Read", "Mail.ReadWrite", "Mail.Send"]
             ))
             
             progress.update(task, description="Account created successfully")
         
         console.print(f"[bold green]✓ Account created successfully![/bold green]")
-        console.print(f"Account ID: {account.id}")
-        console.print(f"Email: {account.email}")
-        console.print(f"Flow: {account.authentication_flow.value}")
+        console.print(f"Account ID: {result['account_id']}")
+        console.print(f"Message: {result['message']}")
         
     except Exception as e:
         console.print(f"[bold red]✗ Failed to create account: {e}[/bold red]")
@@ -221,14 +220,16 @@ def list_accounts():
         table.add_column("Status", style="yellow")
         table.add_column("Last Auth")
         
-        for account in accounts:
-            last_auth = account.last_authenticated_at.strftime("%Y-%m-%d %H:%M") if account.last_authenticated_at else "Never"
+        for account_data in accounts:
+            account = account_data["account"]
+            last_auth = account.get("last_authenticated_at")
+            last_auth_str = last_auth.strftime("%Y-%m-%d %H:%M") if last_auth else "Never"
             table.add_row(
-                account.id[:8] + "...",
-                account.email,
-                account.authentication_flow.value,
-                account.status.value,
-                last_auth
+                account["id"][:8] + "...",
+                account["email"],
+                account["authentication_flow"],
+                account["status"],
+                last_auth_str
             )
         
         console.print(table)
@@ -253,55 +254,41 @@ def authenticate_account(
         
         # Get account
         if account_id:
-            account = asyncio.run(auth_usecases.get_account_by_id(account_id))
+            account_info = asyncio.run(auth_usecases.get_account_info(account_id, by_email=False))
         else:
-            account = asyncio.run(auth_usecases.get_account_by_email(email))
+            account_info = asyncio.run(auth_usecases.get_account_info(email, by_email=True))
         
-        if not account:
+        if not account_info:
             console.print("[bold red]✗ Account not found[/bold red]")
             raise typer.Exit(1)
         
+        account = Account(**account_info["account"])
+        
         console.print(f"[bold blue]Authenticating account: {account.email}[/bold blue]")
         
-        if account.authentication_flow == AuthenticationFlow.AUTHORIZATION_CODE:
-            # Authorization code flow
-            auth_url, state = asyncio.run(auth_usecases.start_authorization_code_flow(account.id))
-            
-            console.print(Panel(
-                f"[bold green]Please visit the following URL to authenticate:[/bold green]\n\n{auth_url}",
-                title="Authorization Required",
-                border_style="green"
-            ))
-            
-            console.print("[yellow]After authentication, the system will automatically receive the callback.[/yellow]")
-            
-        else:
-            # Device code flow
-            device_account = asyncio.run(auth_usecases.start_device_code_flow(account.id))
-            
-            console.print(Panel(
-                f"[bold green]Go to:[/bold green] {device_account.verification_uri}\n"
-                f"[bold green]Enter code:[/bold green] {device_account.user_code}",
-                title="Device Authentication",
-                border_style="green"
-            ))
-            
-            # Poll for completion
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                console=console
-            ) as progress:
-                task = progress.add_task("Waiting for authentication...", total=None)
+        # Start authentication process
+        result = asyncio.run(auth_usecases.authenticate_account(account.id))
+        
+        if result.get("requires_user_action"):
+            if account.authentication_flow == AuthenticationFlow.AUTHORIZATION_CODE:
+                # Authorization code flow
+                console.print(Panel(
+                    f"[bold green]Please visit the following URL to authenticate:[/bold green]\n\n{result['authorization_url']}",
+                    title="Authorization Required",
+                    border_style="green"
+                ))
+                console.print("[yellow]After authentication, the system will automatically receive the callback.[/yellow]")
                 
-                while True:
-                    token = asyncio.run(auth_usecases.poll_device_code_flow(account.id))
-                    if token:
-                        progress.update(task, description="Authentication completed")
-                        break
-                    
-                    asyncio.run(asyncio.sleep(device_account.interval))
-            
+            else:
+                # Device code flow
+                console.print(Panel(
+                    f"[bold green]Go to:[/bold green] {result['verification_uri']}\n"
+                    f"[bold green]Enter code:[/bold green] {result['user_code']}",
+                    title="Device Authentication",
+                    border_style="green"
+                ))
+                console.print("[yellow]Complete the authentication in your browser, then run the command again to check status.[/yellow]")
+        else:
             console.print("[bold green]✓ Authentication completed successfully![/bold green]")
         
     except Exception as e:
